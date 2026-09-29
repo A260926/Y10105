@@ -1,0 +1,98 @@
+:root {
+  --bg: #0f1420;
+  --panel: #171e2e;
+  --panel-2: #1e2740;
+  --line: #2a3450;
+  --text: #e7ecf6;
+  --muted: #97a3bd;
+  --accent: #5b8cff;
+  --allow: #2fb57a;
+  --deny: #e5484d;
+  --needs: #f0a23a;
+  --unknown: #8a93a8;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #15203a, #111726);
+}
+header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+header .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+.layout { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 70px); }
+.sidebar { border-right: 1px solid var(--line); padding: 16px; background: var(--panel); }
+.main { padding: 20px 28px; overflow: auto; }
+.clock {
+  font-size: 12px; color: var(--muted); margin-bottom: 10px;
+  display: flex; gap: 6px; align-items: center;
+}
+.clock input {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  border-radius: 6px; padding: 3px 6px; font-size: 12px; width: 190px;
+}
+.cand-item {
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+  margin-bottom: 8px; cursor: pointer; background: var(--panel-2);
+}
+.cand-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cand-item .name { font-weight: 600; font-size: 14px; }
+.cand-item .meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
+.section { margin-bottom: 22px; }
+.section h2 { font-size: 16px; margin: 0 0 10px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;
+}
+.badge {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: #0c1018;
+}
+.badge.allow { background: var(--allow); }
+.badge.deny { background: var(--deny); color: #fff; }
+.badge.needs_exception { background: var(--needs); }
+.badge.unknown { background: var(--unknown); }
+.badge.frozen { background: #7aa2ff; }
+.badge.draft { background: #586177; color: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+code { background: #0c1220; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  background: #0c1220; padding: 8px 10px; border-radius: 6px; margin: 6px 0;
+  border-left: 3px solid var(--deny); white-space: pre-wrap;
+}
+.path .arrow { color: var(--muted); padding: 0 4px; }
+button {
+  background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+  padding: 7px 14px; font-size: 13px; cursor: pointer;
+}
+button.ghost { background: var(--panel-2); border: 1px solid var(--line); color: var(--text); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.muted { color: var(--muted); font-size: 12px; }
+.warn { color: #ffb057; }
+.good { color: #6ed1a0; }
+input, textarea, select {
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+  border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit;
+}
+textarea { width: 100%; min-height: 60px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 13px; margin: 6px 0; }
+.tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #26304b; color: var(--muted); }
+.toast {
+  position: fixed; right: 18px; bottom: 18px; max-width: 420px;
+  background: #202a44; border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 14px; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+.toast.err { border-color: var(--deny); }
+.diff-old { color: var(--allow); }
+.diff-new { color: var(--deny); }
