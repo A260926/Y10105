@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>依赖许可例外台</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; background: #f5f6f8; color: #1f2329; }
+  header { background: #1f3a5f; color: #fff; padding: 14px 24px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; font-size: 12px; opacity: .8; }
+  main { padding: 16px 24px 48px; display: grid; gap: 16px; }
+  section { background: #fff; border: 1px solid #e3e6eb; border-radius: 8px; padding: 14px 16px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border-bottom: 1px solid #eef0f3; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { color: #6b7280; font-weight: 600; }
+  code { background: #f0f1f4; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .badge { display: inline-block; border-radius: 10px; padding: 1px 10px; font-size: 12px; font-weight: 600; }
+  .allow { background: #e6f6e6; color: #177245; }
+  .allow_exception { background: #e8f0fe; color: #1a56db; }
+  .deny { background: #fde8e8; color: #c81e1e; }
+  .needs_exception { background: #fdf3e0; color: #b45309; }
+  .unknown { background: #edeef1; color: #4b5563; }
+  .active { background: #e6f6e6; color: #177245; }
+  .expired { background: #fde8e8; color: #c81e1e; }
+  .revoked { background: #edeef1; color: #4b5563; }
+  button { border: 1px solid #cbd2dc; background: #fff; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+  button:hover { background: #f0f4fa; }
+  .trace { background: #f8fafc; border: 1px dashed #cbd2dc; border-radius: 6px; padding: 8px 10px; margin-top: 6px; font-size: 12px; }
+  .path { font-family: ui-monospace, monospace; margin: 3px 0; }
+  .diff { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .diff .card { border: 1px solid #e3e6eb; border-radius: 6px; padding: 10px 12px; }
+  .muted { color: #6b7280; font-size: 12px; }
+  .err { color: #c81e1e; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>依赖许可例外台</h1>
+  <p>导入 CycloneDX SBOM · 政策判定 · 例外跟踪 · 候选冻结与追溯</p>
+</header>
+<main>
+  <section id="imports"><h2>导入批次</h2><div>加载中…</div></section>
+  <section id="exceptions"><h2>许可例外（到期状态按当前时钟推导）</h2><div>加载中…</div></section>
+  <section id="diff"><h2>预置对比：同一组件在例外到期前后的新旧结论</h2><div>加载中…</div></section>
+  <section id="candidates"><h2>发布候选</h2><div>加载中…</div></section>
+</main>
+<script>
+const $ = (sel) => document.querySelector(sel);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function badge(decision) {
+  return `<span class="badge ${esc(decision)}">${esc(decision)}</span>`;
+}
+
+function basisText(basis) {
+  if (!basis) return '';
+  if (basis.type === 'exception') return `例外 #${basis.exception_id}`;
+  if (basis.policy_ids && basis.policy_ids.length) return `政策 ${basis.policy_ids.map((p) => '#' + p).join(', ')}`;
+  return basis.note || '无匹配政策';
+}
+
+async function loadImports() {
+  const imports = await api('/api/imports');
+  if (!imports.length) { $('#imports div').textContent = '暂无导入'; return; }
+  const rows = await Promise.all(imports.map(async (imp) => {
+    const detail = await api('/api/imports/' + imp.id);
+    const q = detail.quarantine.map((q) =>
+      `<tr><td>${esc(q.bom_ref)}</td><td>${esc(q.reason)}</td><td>${q.resolved ? '已处理：' + esc(q.resolution_note) : '<b class="err">未处理（冻结被阻塞）</b>'}</td></tr>`).join('');
+    return `<h3>批次 #${imp.id} · ${esc(imp.bom_serial || '')} <span class="muted">${esc(imp.created_at)}</span></h3>
+      <p class="muted">组件 ${imp.component_count} · 依赖边 ${imp.edge_count} · 隔离 ${imp.quarantine_count}</p>
+      ${q ? `<table><tr><th>隔离组件</th><th>原因</th><th>状态</th></tr>${q}</table>` : ''}`;
+  }));
+  $('#imports div').innerHTML = rows.join('');
+}
+
+async function loadExceptions() {
+  const list = await api('/api/exceptions');
+  if (!list.length) { $('#exceptions div').textContent = '暂无条件'; return; }
+  $('#exceptions div').innerHTML = `<table>
+    <tr><th>#</th><th>组件身份</th><th>政策版本</th><th>用途</th><th>理由</th><th>批准人</th><th>到期时刻</th><th>推导状态</th><th>版本</th></tr>
+    ${list.map((e) => `<tr>
+      <td>#${e.id}</td>
+      <td><code>${esc(e.component_purl)}</code> (版本 ${esc(e.component_version)})</td>
+      <td>${esc(e.policy_version)}</td><td>${esc(e.usage)}</td>
+      <td>${esc(e.reason)}</td><td>${esc(e.approver)}</td>
+      <td>${esc(e.expires_at)}</td>
+      <td><span class="badge ${esc(e.derived_state)}">${esc(e.derived_state)}</span></td>
+      <td>v${e.version}</td>
+    </tr>`).join('')}</table>`;
+}
+
+async function trace(candidateId, ref, el) {
+  const data = await api(`/api/candidates/${candidateId}/trace/${encodeURIComponent(ref)}`);
+  const c = data.component;
+  el.innerHTML = `<div class="trace">
+    <div>组件 <code>${esc(c.purl)}</code> · 声明许可 <code>${esc(c.declared_license ?? '未声明')}</code> · ${esc(c.dep_kind === 'direct' ? '直接依赖' : '传递依赖')} · 决议 ${badge(c.decision)} · 依据：${esc(basisText(c.basis))}</div>
+    ${data.paths.map((p) => `<div class="path">${p.map((r) => esc(r)).join(' → ')}</div>`).join('')}
+  </div>`;
+}
+
+async function loadCandidates() {
+  const list = await api('/api/candidates');
+  const blocks = [];
+  for (const cand of list) {
+    const view = await api('/api/candidates/' + cand.id);
+    const rows = view.components.map((c) => `<tr>
+      <td><code>${esc(c.bom_ref)}</code></td>
+      <td><code>${esc(c.purl)}</code></td>
+      <td><code>${esc(c.declared_license ?? '—')}</code></td>
+      <td>${esc(c.dep_kind === 'direct' ? '直接' : '传递')}</td>
+      <td>${badge(c.decision)}</td>
+      <td>${esc(basisText(c.basis))}</td>
+      <td><button data-cand="${view.id}" data-ref="${esc(c.bom_ref)}">追溯到根</button></td>
+    </tr><tr class="trace-row" style="display:none"><td colspan="7"><div id="trace-${view.id}-${esc(c.bom_ref)}"></div></td></tr>`).join('');
+    blocks.push(`<h3>${esc(view.name)} <span class="muted">状态 ${esc(view.status)} · 政策 ${esc(view.policy_version ?? '—')} · 冻结于 ${esc(view.frozen_at ?? '未冻结')}</span>
+      <button onclick="window.open('/api/candidates/${view.id}/export')">导出</button></h3>
+      <table><tr><th>组件</th><th>purl</th><th>声明许可</th><th>依赖</th><th>决议</th><th>依据</th><th></th></tr>${rows}</table>`);
+  }
+  $('#candidates div').innerHTML = blocks.join('') || '暂无候选';
+  document.querySelectorAll('#candidates button[data-ref]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('tr').nextElementSibling;
+      row.style.display = row.style.display === 'none' ? '' : 'none';
+      trace(btn.dataset.cand, btn.dataset.ref, row.querySelector('div'));
+    });
+  });
+  renderDiff(list);
+}
+
+async function renderDiff(list) {
+  const target = 'pkg:npm/lgpl-widget@2.0.5';
+  const cards = [];
+  for (const cand of list) {
+    const view = await api('/api/candidates/' + cand.id);
+    const comp = view.components.find((c) => c.purl === target);
+    if (!comp) continue;
+    cards.push(`<div class="card"><b>${esc(view.name)}</b> <span class="muted">评估时钟 ${esc(view.frozen_at ?? '现在')}</span><br>
+      <code>${esc(target)}</code> → ${badge(comp.decision)}<br>
+      <span class="muted">依据：${esc(basisText(comp.basis))}</span></div>`);
+  }
+  $('#diff div').innerHTML = cards.length >= 2
+    ? `<div class="diff">${cards.join('')}</div>`
+    : '预置候选不足，无法对比';
+}
+
+(async () => {
+  try {
+    await Promise.all([loadImports(), loadExceptions(), loadCandidates()]);
+  } catch (err) {
+    document.querySelector('main').insertAdjacentHTML('afterbegin', `<section class="err">加载失败：${esc(err.message)}</section>`);
+  }
+})();
+</script>
+</body>
+</html>
